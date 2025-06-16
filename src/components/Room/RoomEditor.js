@@ -45,26 +45,42 @@ const RoomEditor = ({ rooms, onRoomsUpdate, items = [], onItemsUpdate }) => {
   useEffect(() => {
     const currentRoom = rooms.find(r => r.id === roomId);
     if (currentRoom) {
-      setRoom(currentRoom);
-    } else {
+      // 避免在已有本地状态时被来自 props 的旧数据覆盖
+      // 仅当 room state 为空，或者 roomId 变化时才设置
+      if (!room || room.id !== roomId) {
+        setRoom(currentRoom);
+      }
+    } else if (rooms.length > 0) {
+      // 如果房间列表加载完成但找不到对应房间，则导航离开
       navigate('/rooms');
     }
+  }, [roomId, rooms, navigate, room]);
 
-    // 处理高亮物品参数
+  // 单独处理高亮和展开逻辑
+  useEffect(() => {
     const highlightItem = searchParams.get('highlightItem');
     if (highlightItem) {
       setHighlightedItemId(highlightItem);
+      
+      const itemToHighlight = items.find(item => item.id === highlightItem);
+      // 确保 room 数据已加载
+      if (itemToHighlight && itemToHighlight.furnitureId && room) {
+        const furnitureToExpand = room.furniture.find(f => f.id === itemToHighlight.furnitureId);
+        if (furnitureToExpand) {
+          setExpandedFurniture(furnitureToExpand);
+        }
+      }
+
       // 5秒后清除高亮效果
       const timer = setTimeout(() => {
         setHighlightedItemId(null);
-        // 清除URL参数
         const newSearchParams = new URLSearchParams(searchParams);
         newSearchParams.delete('highlightItem');
-        setSearchParams(newSearchParams);
+        setSearchParams(newSearchParams, { replace: true });
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [roomId, rooms, navigate, searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, items, room, roomId]);
 
   const handleSaveRoom = () => {
     if (!room) return;
