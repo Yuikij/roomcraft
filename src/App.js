@@ -12,6 +12,10 @@ import RoomManager from './components/Room/RoomManager';
 import RoomEditor from './components/Room/RoomEditor';
 import ItemManager from './components/Item/ItemManager';
 import SearchPage from './components/Search/SearchPage';
+import ExpiryManager from './components/Expiry/ExpiryManager';
+import ExpiryNotifications from './components/Expiry/ExpiryNotifications';
+import StockManager from './components/Stock/StockManager';
+import StockNotifications from './components/Stock/StockNotifications';
 
 function App() {
   const [rooms, setRooms] = useState([]);
@@ -122,6 +126,26 @@ function App() {
           <div className="flex-1 lg:ml-80 min-h-screen">
             <Header onSidebarToggle={handleSidebarToggle} />
             <main className="p-6 pt-20">
+              {/* 通知组件 */}
+              <div className="fixed top-4 right-4 z-50 flex items-center space-x-2">
+                <ExpiryNotifications 
+                  items={items}
+                  onItemUpdate={(itemId, updatedItem) => {
+                    const updatedItems = items.map(item => 
+                      item.id === itemId ? { ...item, ...updatedItem } : item
+                    );
+                    handleItemsUpdate(updatedItems);
+                  }}
+                />
+                <StockNotifications 
+                  items={items}
+                  onMarkAsRead={(notificationIds) => {
+                    // 可以在这里实现通知已读状态的持久化
+                    console.log('标记已读:', notificationIds);
+                  }}
+                />
+              </div>
+              
               <Routes>
                 <Route 
                   path="/" 
@@ -172,6 +196,30 @@ function App() {
                     <SearchPage 
                       rooms={rooms}
                       items={items}
+                    />
+                  } 
+                />
+                <Route 
+                  path="/expiry" 
+                  element={
+                    <ExpiryManager 
+                      rooms={rooms}
+                      items={items}
+                      onItemUpdate={handleItemsUpdate}
+                    />
+                  } 
+                />
+                <Route 
+                  path="/stock" 
+                  element={
+                    <StockManager 
+                      items={items}
+                      onItemUpdate={(itemId, updatedItem) => {
+                        const updatedItems = items.map(item => 
+                          item.id === itemId ? { ...item, ...updatedItem } : item
+                        );
+                        handleItemsUpdate(updatedItems);
+                      }}
                     />
                   } 
                 />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Home, Archive, Package, Search, Plus, MapPin } from 'lucide-react';
+import { X, Home, Archive, Package, Search, Plus, MapPin, Clock, TrendingDown } from 'lucide-react';
 import { ROOM_TYPE_LABELS } from '../../utils/constants';
 
 const Sidebar = ({ isOpen, onClose, rooms, onRoomSelect, selectedRoom }) => {
@@ -11,6 +11,8 @@ const Sidebar = ({ isOpen, onClose, rooms, onRoomSelect, selectedRoom }) => {
     { icon: Home, label: '仪表盘', path: '/' },
     { icon: Archive, label: '房间管理', path: '/rooms' },
     { icon: Package, label: '物品管理', path: '/items' },
+    { icon: Clock, label: '过期管理', path: '/expiry' },
+    { icon: TrendingDown, label: '库存管理', path: '/stock' },
     { icon: Search, label: '搜索', path: '/search' },
   ];
 
