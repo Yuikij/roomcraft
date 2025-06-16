@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Package, Filter, Search, Clock, TrendingDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { itemStorage } from '../../utils/storage';
@@ -9,11 +10,13 @@ import ItemCard from './ItemCard';
 import Modal from '../Common/Modal';
 
 const ItemManager = ({ rooms, items, onItemsUpdate, selectedRoom }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeTab, setActiveTab] = useState('basic'); // basic, expiry, stock
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedRoomFilter, setSelectedRoomFilter] = useState('all');
+  const [highlightedItemId, setHighlightedItemId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     category: ITEM_CATEGORIES.OTHER,
@@ -186,6 +189,23 @@ const ItemManager = ({ rooms, items, onItemsUpdate, selectedRoom }) => {
       averageUsage: ''
     });
   };
+
+  // 处理高亮物品参数
+  useEffect(() => {
+    const highlightItem = searchParams.get('highlightItem');
+    if (highlightItem) {
+      setHighlightedItemId(highlightItem);
+      // 5秒后清除高亮效果
+      const timer = setTimeout(() => {
+        setHighlightedItemId(null);
+        // 清除URL参数
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('highlightItem');
+        setSearchParams(newSearchParams);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -382,6 +402,7 @@ const ItemManager = ({ rooms, items, onItemsUpdate, selectedRoom }) => {
               rooms={rooms}
               onUpdate={handleUpdateItem}
               onDelete={handleDeleteItem}
+              isHighlighted={highlightedItemId === item.id}
             />
           ))}
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Save, Plus, Move, Trash2, Home, ArrowLeft, Package } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { roomStorage, itemStorage } from '../../utils/storage';
@@ -9,10 +9,12 @@ import Modal from '../Common/Modal';
 const RoomEditor = ({ rooms, onRoomsUpdate, items = [], onItemsUpdate }) => {
   const { id: roomId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [room, setRoom] = useState(null);
   const [selectedFurniture, setSelectedFurniture] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [expandedFurniture, setExpandedFurniture] = useState(null);
+  const [highlightedItemId, setHighlightedItemId] = useState(null);
   
   // 简化状态管理，使用独立状态
   const [liveFurnitureStyle, setLiveFurnitureStyle] = useState(null);
@@ -47,7 +49,22 @@ const RoomEditor = ({ rooms, onRoomsUpdate, items = [], onItemsUpdate }) => {
     } else {
       navigate('/rooms');
     }
-  }, [roomId, rooms, navigate]);
+
+    // 处理高亮物品参数
+    const highlightItem = searchParams.get('highlightItem');
+    if (highlightItem) {
+      setHighlightedItemId(highlightItem);
+      // 5秒后清除高亮效果
+      const timer = setTimeout(() => {
+        setHighlightedItemId(null);
+        // 清除URL参数
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('highlightItem');
+        setSearchParams(newSearchParams);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [roomId, rooms, navigate, searchParams, setSearchParams]);
 
   const handleSaveRoom = () => {
     if (!room) return;
@@ -595,13 +612,22 @@ const RoomEditor = ({ rooms, onRoomsUpdate, items = [], onItemsUpdate }) => {
                   ) : (
                     <div className="space-y-2">
                       {furnitureItems.map(item => (
-                        <div key={item.id} className="flex items-center space-x-2 p-2 bg-neutral-50 rounded">
+                        <button
+                          key={item.id}
+                          onClick={() => navigate(`/items?highlightItem=${item.id}`)}
+                          className={`w-full flex items-center space-x-2 p-2 rounded transition-all duration-300 hover:bg-primary-50 hover:border-primary-200 border ${
+                            highlightedItemId === item.id 
+                              ? 'bg-yellow-100 border-yellow-400 shadow-lg animate-pulse' 
+                              : 'bg-neutral-50 border-transparent'
+                          }`}
+                          title="点击查看物品详情"
+                        >
                           <Package className="w-4 h-4 text-primary-500" />
-                          <div className="flex-1">
+                          <div className="flex-1 text-left">
                             <div className="text-xs font-medium text-neutral-800">{item.name}</div>
                             <div className="text-xs text-neutral-500">数量: {item.quantity}</div>
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -635,7 +661,9 @@ const RoomEditor = ({ rooms, onRoomsUpdate, items = [], onItemsUpdate }) => {
                 <div
                   key={item.id}
                   className={`absolute bg-white rounded-lg shadow-lg border-2 cursor-move draggable-element ${
-                    isSelectedItem ? 'border-primary-500 z-10' : 'border-neutral-200 hover:border-primary-300'
+                    isSelectedItem ? 'border-primary-500 z-10' : 
+                    highlightedItemId === item.id ? 'border-yellow-400 bg-yellow-100 shadow-xl animate-pulse z-20' :
+                    'border-neutral-200 hover:border-primary-300'
                   } ${isInteractingItem ? '' : 'transition-all'}`}
                   style={{
                     left: itemX,
@@ -645,8 +673,10 @@ const RoomEditor = ({ rooms, onRoomsUpdate, items = [], onItemsUpdate }) => {
                     minWidth: '60px',
                     minHeight: '40px'
                   }}
-                                        onMouseDown={(e) => handleItemMouseDown(e, item)}
-                      onTouchStart={(e) => handleItemMouseDown(e, item)}
+                  onMouseDown={(e) => handleItemMouseDown(e, item)}
+                  onTouchStart={(e) => handleItemMouseDown(e, item)}
+                  onDoubleClick={() => navigate(`/items?highlightItem=${item.id}`)}
+                  title="拖拽移动物品位置，双击跳转到物品管理查看详情"
                 >
                   <div className="p-2 text-center h-full flex flex-col justify-center">
                     <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white mx-auto mb-1">

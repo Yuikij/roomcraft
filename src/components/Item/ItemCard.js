@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Edit, Trash2, MapPin, Package, Calendar, Plus, Clock, AlertTriangle, TrendingDown } from 'lucide-react';
 import { ITEM_CATEGORY_LABELS, EXPIRY_STATUS, EXPIRY_STATUS_LABELS, EXPIRY_COLORS, getDefaultReminderDays, getDefaultStockThreshold } from '../../utils/constants';
 import { getExpiryStatus, formatRemainingDays, getReminderDaysByCategory, calculateExpiryDate } from '../../utils/expiryUtils';
 import { getStockStatusInfo, formatStockStatusText, getDefaultThreshold } from '../../utils/stockUtils';
 import Modal from '../Common/Modal';
 
-const ItemCard = ({ item, rooms, onUpdate, onDelete }) => {
+const ItemCard = ({ item, rooms, onUpdate, onDelete, isHighlighted = false }) => {
+  const navigate = useNavigate();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [activeTab, setActiveTab] = useState('basic'); // basic, expiry, stock
@@ -206,7 +208,11 @@ const ItemCard = ({ item, rooms, onUpdate, onDelete }) => {
 
   return (
     <>
-      <div className="glass-effect rounded-2xl p-6 card-hover group relative overflow-hidden">
+      <div className={`glass-effect rounded-2xl p-6 card-hover group relative overflow-hidden transition-all duration-300 ${
+        isHighlighted 
+          ? 'bg-yellow-100 border-2 border-yellow-400 shadow-xl animate-pulse' 
+          : ''
+      }`}>
         {/* 背景装饰 */}
         <div className="absolute -top-6 -right-6 w-12 h-12 bg-primary-500/10 rounded-full" />
         
@@ -249,7 +255,17 @@ const ItemCard = ({ item, rooms, onUpdate, onDelete }) => {
           {/* 位置信息 */}
           <div className="flex items-center space-x-2 mb-3">
             <MapPin className="w-4 h-4 text-neutral-400" />
-            <span className="text-sm text-neutral-600">{getLocationText()}</span>
+            <button
+              onClick={() => {
+                if (room?.id) {
+                  navigate(`/room/${room.id}?highlightItem=${item.id}`);
+                }
+              }}
+              className="text-sm text-neutral-600 hover:text-primary-600 hover:underline transition-colors text-left"
+              title="点击查看物品在房间中的位置"
+            >
+              {getLocationText()}
+            </button>
           </div>
 
           {/* 数量、库存状态和过期状态 */}

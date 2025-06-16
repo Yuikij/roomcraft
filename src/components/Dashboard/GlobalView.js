@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Package, Edit, Plus, Move, Save } from 'lucide-react';
+import { Home, Package, Edit, Plus, Move, Save, ArrowLeft, BarChart3 } from 'lucide-react';
 import { ROOM_TYPE_LABELS } from '../../utils/constants';
 
-const GlobalView = ({ rooms, items, onRoomsUpdate }) => {
+const GlobalView = ({ rooms, items, onRoomsUpdate, onBackToOverview }) => {
   const navigate = useNavigate();
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [livePosition, setLivePosition] = useState(null);
@@ -261,12 +261,26 @@ const GlobalView = ({ rooms, items, onRoomsUpdate }) => {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* 页面头部 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-800 mb-2">全局视图</h1>
-          <p className="text-neutral-600">查看和编辑所有房间的布局</p>
-        </div>
-        <div className="flex items-center space-x-3">
+      <div className="glass-effect rounded-3xl p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            {/* 返回主页按钮 */}
+            <button
+              onClick={onBackToOverview}
+              className="flex items-center space-x-2 px-4 py-2 rounded-2xl bg-white/60 hover:bg-white/80 transition-all duration-300 group"
+              title="返回主页"
+            >
+              <ArrowLeft className="w-5 h-5 text-neutral-600 group-hover:text-neutral-800 transition-colors" />
+              <BarChart3 className="w-5 h-5 text-neutral-600 group-hover:text-neutral-800 transition-colors" />
+              <span className="text-neutral-600 group-hover:text-neutral-800 font-medium transition-colors">返回概览</span>
+            </button>
+            
+            <div>
+              <h1 className="text-2xl font-bold text-neutral-800 mb-1">全局视图</h1>
+              <p className="text-neutral-600">查看和编辑所有房间的布局</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
           {hasUnsavedChanges && (
             <>
               <button
@@ -291,6 +305,7 @@ const GlobalView = ({ rooms, items, onRoomsUpdate }) => {
             <Plus className="w-5 h-5" />
             <span>添加房间</span>
           </button>
+          </div>
         </div>
       </div>
 
