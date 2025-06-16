@@ -151,6 +151,7 @@ function App() {
                       rooms={rooms} 
                       onRoomsUpdate={handleRoomsUpdate}
                       items={items}
+                      onItemsUpdate={handleItemsUpdate}
                     />
                   } 
                 />

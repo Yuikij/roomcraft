@@ -119,50 +119,109 @@ const ItemManager = ({ rooms, items, onItemsUpdate, selectedRoom }) => {
 
       {/* 搜索和过滤 */}
       <div className="glass-effect rounded-2xl p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* 搜索框 */}
+        <div className="flex flex-col space-y-4">
+          {/* 搜索框 - 独立一行，更突出 */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-neutral-400" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-neutral-400" />
             <input
               type="text"
-              placeholder="搜索物品..."
+              placeholder="搜索物品名称、描述或标签..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-colors"
+              className="search-input-enhanced w-full pl-12 pr-4 py-4 text-lg rounded-xl border border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
             />
           </div>
 
-          {/* 类别过滤 */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-colors"
-          >
-            <option value="all">全部类别</option>
-            {Object.entries(ITEM_CATEGORY_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
+          {/* 过滤器和统计 - 响应式网格 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* 类别过滤 */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-neutral-700">类别筛选</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="filter-select-enhanced w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+              >
+                <option value="all">全部类别</option>
+                {Object.entries(ITEM_CATEGORY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
 
-          {/* 房间过滤 */}
-          <select
-            value={selectedRoomFilter}
-            onChange={(e) => setSelectedRoomFilter(e.target.value)}
-            className="px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-colors"
-          >
-            <option value="all">全部房间</option>
-            {rooms.map(room => (
-              <option key={room.id} value={room.id}>{room.name}</option>
-            ))}
-          </select>
+            {/* 房间过滤 */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-neutral-700">房间筛选</label>
+              <select
+                value={selectedRoomFilter}
+                onChange={(e) => setSelectedRoomFilter(e.target.value)}
+                className="filter-select-enhanced w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+              >
+                <option value="all">全部房间</option>
+                {rooms.map(room => (
+                  <option key={room.id} value={room.id}>{room.name}</option>
+                ))}
+              </select>
+            </div>
 
-          {/* 统计信息 */}
-          <div className="flex items-center justify-center bg-neutral-50 rounded-xl px-4 py-3">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-neutral-800">{filteredItems.length}</p>
-              <p className="text-sm text-neutral-600">个物品</p>
+            {/* 统计信息 */}
+            <div className="stats-card flex items-center justify-center rounded-xl px-4 py-3">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-primary-600">{filteredItems.length}</p>
+                <p className="text-sm text-primary-700 font-medium">个物品</p>
+              </div>
             </div>
           </div>
+
+          {/* 快速筛选标签 */}
+          {(searchTerm || selectedCategory !== 'all' || selectedRoomFilter !== 'all') && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-neutral-200">
+              <span className="text-sm text-neutral-600 font-medium">当前筛选:</span>
+              {searchTerm && (
+                <span className="filter-tag inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  搜索: {searchTerm}
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="ml-2 text-blue-600 hover:text-blue-800"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {selectedCategory !== 'all' && (
+                <span className="filter-tag inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  类别: {ITEM_CATEGORY_LABELS[selectedCategory]}
+                  <button
+                    onClick={() => setSelectedCategory('all')}
+                    className="ml-2 text-green-600 hover:text-green-800"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {selectedRoomFilter !== 'all' && (
+                <span className="filter-tag inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  房间: {rooms.find(r => r.id === selectedRoomFilter)?.name}
+                  <button
+                    onClick={() => setSelectedRoomFilter('all')}
+                    className="ml-2 text-purple-600 hover:text-purple-800"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedCategory('all');
+                  setSelectedRoomFilter('all');
+                }}
+                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+              >
+                清除所有筛选
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

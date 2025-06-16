@@ -1,57 +1,258 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Package, Edit, Plus, Move } from 'lucide-react';
+import { Home, Package, Edit, Plus, Move, Save } from 'lucide-react';
 import { ROOM_TYPE_LABELS } from '../../utils/constants';
 
 const GlobalView = ({ rooms, items, onRoomsUpdate }) => {
   const navigate = useNavigate();
   const [selectedRoom, setSelectedRoom] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [livePosition, setLivePosition] = useState(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [tempRoomPositions, setTempRoomPositions] = useState({});
+  
+  // 使用 useRef 来存储拖拽状态，避免 useCallback 频繁重新创建
+  const dragStateRef = useRef({
+    isDragging: false,
+    isResizing: false,
+    dragOffset: { x: 0, y: 0 },
+    resizeHandle: null,
+    selectedRoom: null
+  });
+
+  // 获取事件的坐标（支持鼠标和触屏）
+  const getEventCoordinates = (e) => {
+    if (e.touches && e.touches.length > 0) {
+      return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
+    }
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      return { clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY };
+    }
+    return { clientX: e.clientX, clientY: e.clientY };
+  };
 
   const handleRoomMouseDown = (e, room) => {
     e.preventDefault();
-    setSelectedRoom(room);
-    setIsDragging(true);
+    e.stopPropagation();
     
-    const rect = e.currentTarget.getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    });
+    setSelectedRoom(room);
+    
+    const container = document.getElementById('global-canvas');
+    if (!container) return;
+    
+    const containerRect = container.getBoundingClientRect();
+    const index = rooms.findIndex(r => r.id === room.id);
+    
+    // 获取当前房间位置（可能是临时位置或原始位置）
+    const currentPos = tempRoomPositions[room.id];
+    const roomX = currentPos?.x ?? room.globalX ?? 50 + (index % 4) * 220;
+    const roomY = currentPos?.y ?? room.globalY ?? 50 + Math.floor(index / 4) * 170;
+    const roomWidth = currentPos?.width ?? room.globalWidth ?? 200;
+    const roomHeight = currentPos?.height ?? room.globalHeight ?? 150;
+
+    // 考虑容器的 border，计算鼠标相对于容器内容区域的位置
+    const borderWidth = 2;
+    const { clientX, clientY } = getEventCoordinates(e);
+    const mouseX = clientX - containerRect.left - borderWidth;
+    const mouseY = clientY - containerRect.top - borderWidth;
+
+    // 检查是否点击了调整大小手柄
+    if (e.target.classList.contains('resize-handle')) {
+      document.body.style.cursor = getComputedStyle(e.target).cursor;
+      dragStateRef.current = {
+        isDragging: false,
+        isResizing: true,
+        resizeHandle: e.target.dataset.handle,
+        selectedRoom: room,
+        dragOffset: { x: 0, y: 0 }
+      };
+      
+      setLivePosition({ 
+        x: roomX, 
+        y: roomY, 
+        width: roomWidth, 
+        height: roomHeight 
+      });
+      return;
+    }
+
+    // 更新 ref 状态
+    dragStateRef.current = {
+      isDragging: true,
+      isResizing: false,
+      selectedRoom: room,
+      resizeHandle: null,
+      dragOffset: {
+        x: mouseX - roomX,
+        y: mouseY - roomY
+      }
+    };
+
+    setLivePosition({ x: roomX, y: roomY, width: roomWidth, height: roomHeight });
   };
 
-  const handleMouseMove = (e) => {
-    if (!isDragging || !selectedRoom) return;
+  const handleMouseMove = useCallback((e) => {
+    const { isDragging, isResizing, selectedRoom, dragOffset, resizeHandle } = dragStateRef.current;
+    
+    if (!isDragging && !isResizing || !selectedRoom) return;
 
     const container = document.getElementById('global-canvas');
+    if (!container) return;
+    
     const containerRect = container.getBoundingClientRect();
     
-    const newX = Math.max(0, Math.min(
-      containerRect.width - (selectedRoom.globalWidth || 200),
-      e.clientX - containerRect.left - dragOffset.x
-    ));
+    // 考虑容器的 border (border-2 = 2px)
+    const borderWidth = 2;
+    const availableWidth = containerRect.width - borderWidth * 2;
+    const availableHeight = containerRect.height - borderWidth * 2;
     
-    const newY = Math.max(0, Math.min(
-      containerRect.height - (selectedRoom.globalHeight || 150),
-      e.clientY - containerRect.top - dragOffset.y
-    ));
+    // 计算鼠标相对于容器内容区域的位置
+    const { clientX, clientY } = getEventCoordinates(e);
+    const mouseX = clientX - containerRect.left - borderWidth;
+    const mouseY = clientY - containerRect.top - borderWidth;
+    
+    if (isDragging) {
+      const roomWidth = livePosition?.width ?? selectedRoom.globalWidth ?? 200;
+      const roomHeight = livePosition?.height ?? selectedRoom.globalHeight ?? 150;
+      
+      // 计算元素应该的位置（考虑拖拽偏移）
+      let newX = mouseX - dragOffset.x;
+      let newY = mouseY - dragOffset.y;
+      
+      // 边界限制：确保元素完全在容器内容区域内，并且能够贴合边界
+      newX = Math.max(0, Math.min(availableWidth - roomWidth, newX));
+      newY = Math.max(0, Math.min(availableHeight - roomHeight, newY));
 
-    // 更新房间全局位置
-    const updatedRooms = rooms.map(r =>
-      r.id === selectedRoom.id
-        ? { ...r, globalX: newX, globalY: newY }
-        : r
-    );
+      // 直接更新位置，不依赖其他状态
+      setLivePosition(prev => ({ ...prev, x: newX, y: newY }));
+      
+    } else if (isResizing) {
+      const currentPos = tempRoomPositions[selectedRoom.id];
+      const originalX = currentPos?.x ?? selectedRoom.globalX ?? 50;
+      const originalY = currentPos?.y ?? selectedRoom.globalY ?? 50;
+      const originalWidth = currentPos?.width ?? selectedRoom.globalWidth ?? 200;
+      const originalHeight = currentPos?.height ?? selectedRoom.globalHeight ?? 150;
+
+      let { x, y, width, height } = { 
+        x: originalX, 
+        y: originalY, 
+        width: originalWidth, 
+        height: originalHeight 
+      };
+
+      switch (resizeHandle) {
+        case 'se':
+          width = Math.max(100, Math.min(availableWidth - originalX, mouseX - originalX));
+          height = Math.max(80, Math.min(availableHeight - originalY, mouseY - originalY));
+          break;
+        case 'sw':
+          width = Math.max(100, originalX + originalWidth - mouseX);
+          height = Math.max(80, Math.min(availableHeight - originalY, mouseY - originalY));
+          x = Math.max(0, mouseX);
+          break;
+        case 'ne':
+          width = Math.max(100, Math.min(availableWidth - originalX, mouseX - originalX));
+          height = Math.max(80, originalY + originalHeight - mouseY);
+          y = Math.max(0, mouseY);
+          break;
+        case 'nw':
+          width = Math.max(100, originalX + originalWidth - mouseX);
+          height = Math.max(80, originalY + originalHeight - mouseY);
+          x = Math.max(0, mouseX);
+          y = Math.max(0, mouseY);
+          break;
+        default: break;
+      }
+      
+      setLivePosition({ x, y, width, height });
+    }
+  }, [livePosition, tempRoomPositions]); // 空依赖数组，避免重新创建
+
+  const handleMouseUp = useCallback(() => {
+    const { isDragging, isResizing, selectedRoom } = dragStateRef.current;
+    
+    document.body.style.cursor = 'default';
+    
+    if ((isDragging || isResizing) && selectedRoom && livePosition) {
+      // 保存到临时位置，不立即更新到 rooms
+      setTempRoomPositions(prev => ({
+        ...prev,
+        [selectedRoom.id]: { 
+          x: livePosition.x, 
+          y: livePosition.y,
+          width: livePosition.width,
+          height: livePosition.height
+        }
+      }));
+      setHasUnsavedChanges(true);
+    }
+    
+    // 重置拖拽状态
+    dragStateRef.current = {
+      isDragging: false,
+      isResizing: false,
+      selectedRoom: null,
+      resizeHandle: null,
+      dragOffset: { x: 0, y: 0 }
+    };
+    
+    setLivePosition(null);
+  }, [livePosition]);
+
+  // 保存所有位置变更
+  const handleSaveChanges = () => {
+    if (!hasUnsavedChanges) return;
+    
+    const updatedRooms = rooms.map(room => {
+      const tempPos = tempRoomPositions[room.id];
+      if (tempPos) {
+        return { 
+          ...room, 
+          globalX: tempPos.x, 
+          globalY: tempPos.y,
+          globalWidth: tempPos.width,
+          globalHeight: tempPos.height
+        };
+      }
+      return room;
+    });
     
     onRoomsUpdate(updatedRooms);
-    setSelectedRoom({ ...selectedRoom, globalX: newX, globalY: newY });
+    setTempRoomPositions({});
+    setHasUnsavedChanges(false);
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setDragOffset({ x: 0, y: 0 });
+  // 取消所有未保存的变更
+  const handleCancelChanges = () => {
+    setTempRoomPositions({});
+    setHasUnsavedChanges(false);
+    setSelectedRoom(null);
   };
+
+  // 添加全局事件监听器以确保拖拽在整个窗口范围内工作
+  useEffect(() => {
+    const handleGlobalMouseMove = (e) => handleMouseMove(e);
+    const handleGlobalMouseUp = () => handleMouseUp();
+    const handleGlobalTouchMove = (e) => {
+      e.preventDefault(); // 防止页面滚动
+      handleMouseMove(e);
+    };
+    const handleGlobalTouchEnd = () => handleMouseUp();
+
+    // 鼠标事件
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+    
+    // 触屏事件
+    document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+    document.addEventListener('touchend', handleGlobalTouchEnd);
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.removeEventListener('touchmove', handleGlobalTouchMove);
+      document.removeEventListener('touchend', handleGlobalTouchEnd);
+    };
+  }, [handleMouseMove, handleMouseUp]);
 
   const getRoomItems = (roomId) => {
     return items.filter(item => item.roomId === roomId);
@@ -65,23 +266,45 @@ const GlobalView = ({ rooms, items, onRoomsUpdate }) => {
           <h1 className="text-2xl font-bold text-neutral-800 mb-2">全局视图</h1>
           <p className="text-neutral-600">查看和编辑所有房间的布局</p>
         </div>
-        <button
-          onClick={() => navigate('/rooms')}
-          className="gradient-primary text-white px-6 py-3 rounded-2xl font-medium hover:shadow-floating transition-all duration-300 flex items-center space-x-2"
-        >
-          <Plus className="w-5 h-5" />
-          <span>添加房间</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          {hasUnsavedChanges && (
+            <>
+              <button
+                onClick={handleCancelChanges}
+                className="px-4 py-2 rounded-xl text-neutral-600 hover:bg-neutral-100 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSaveChanges}
+                className="gradient-primary text-white px-6 py-3 rounded-2xl font-medium hover:shadow-floating transition-all duration-300 flex items-center space-x-2"
+              >
+                <Save className="w-5 h-5" />
+                <span>保存布局</span>
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => navigate('/rooms')}
+            className="gradient-primary text-white px-6 py-3 rounded-2xl font-medium hover:shadow-floating transition-all duration-300 flex items-center space-x-2"
+          >
+            <Plus className="w-5 h-5" />
+            <span>添加房间</span>
+          </button>
+        </div>
       </div>
 
       {/* 全局画布 */}
       <div className="glass-effect rounded-2xl p-6">
         <div
           id="global-canvas"
-          className="relative w-full h-96 bg-gradient-to-br from-neutral-50 to-neutral-100 rounded-xl border-2 border-dashed border-neutral-200 overflow-hidden"
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          className="relative w-full h-[600px] bg-gradient-to-br from-neutral-50 to-neutral-100 rounded-xl border-2 border-dashed border-neutral-200 overflow-hidden touch-optimized"
+          onClick={(e) => {
+            // 点击空白区域时清除选中状态
+            if (e.target === e.currentTarget) {
+              setSelectedRoom(null);
+            }
+          }}
         >
           {rooms.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -101,19 +324,40 @@ const GlobalView = ({ rooms, items, onRoomsUpdate }) => {
           ) : (
             rooms.map((room, index) => {
               const roomItems = getRoomItems(room.id);
-              const roomX = room.globalX || 50 + (index % 4) * 220;
-              const roomY = room.globalY || 50 + Math.floor(index / 4) * 170;
-              const roomWidth = room.globalWidth || 200;
-              const roomHeight = room.globalHeight || 150;
+              
+              const isSelected = selectedRoom?.id === room.id;
+              const isBeingInteracted = isSelected && (dragStateRef.current.isDragging || dragStateRef.current.isResizing);
+              const hasUnsavedPosition = tempRoomPositions[room.id];
+
+              // 获取房间位置和尺寸：交互中 > 临时位置 > 原始位置 > 默认位置
+              let roomX, roomY, roomWidth, roomHeight;
+              if (isBeingInteracted && livePosition) {
+                roomX = livePosition.x;
+                roomY = livePosition.y;
+                roomWidth = livePosition.width;
+                roomHeight = livePosition.height;
+              } else if (hasUnsavedPosition) {
+                roomX = hasUnsavedPosition.x;
+                roomY = hasUnsavedPosition.y;
+                roomWidth = hasUnsavedPosition.width;
+                roomHeight = hasUnsavedPosition.height;
+              } else {
+                roomX = room.globalX ?? 50 + (index % 4) * 220;
+                roomY = room.globalY ?? 50 + Math.floor(index / 4) * 170;
+                roomWidth = room.globalWidth || 200;
+                roomHeight = room.globalHeight || 150;
+              }
               
               return (
                 <div
                   key={room.id}
-                  className={`absolute cursor-move rounded-lg border-2 transition-all duration-200 ${
-                    selectedRoom?.id === room.id
+                  className={`absolute cursor-move rounded-lg border-2 draggable-element ${
+                    isSelected
                       ? 'border-primary-500 shadow-floating z-10'
+                      : hasUnsavedPosition
+                      ? 'border-orange-400 shadow-md'
                       : 'border-neutral-300 hover:border-neutral-400'
-                  }`}
+                  } ${isBeingInteracted ? '' : 'transition-all duration-200'}`}
                   style={{
                     left: roomX,
                     top: roomY,
@@ -122,6 +366,7 @@ const GlobalView = ({ rooms, items, onRoomsUpdate }) => {
                     backgroundColor: room.color + '20'
                   }}
                   onMouseDown={(e) => handleRoomMouseDown(e, room)}
+                  onTouchStart={(e) => handleRoomMouseDown(e, room)}
                 >
                   {/* 房间头部 */}
                   <div 
@@ -133,6 +378,9 @@ const GlobalView = ({ rooms, items, onRoomsUpdate }) => {
                       <span className="text-white text-sm font-medium truncate">
                         {room.name}
                       </span>
+                      {hasUnsavedPosition && (
+                        <span className="text-white/80 text-xs">●</span>
+                      )}
                     </div>
                     <button
                       onClick={(e) => {
@@ -200,7 +448,12 @@ const GlobalView = ({ rooms, items, onRoomsUpdate }) => {
 
                   {/* 调整大小手柄 */}
                   {selectedRoom?.id === room.id && (
-                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-primary-500 border border-white cursor-se-resize"></div>
+                    <>
+                      <div className="resize-handle absolute -bottom-1 -right-1 bg-primary-500 border border-white cursor-se-resize" data-handle="se"></div>
+                      <div className="resize-handle absolute -bottom-1 -left-1 bg-primary-500 border border-white cursor-sw-resize" data-handle="sw"></div>
+                      <div className="resize-handle absolute -top-1 -right-1 bg-primary-500 border border-white cursor-ne-resize" data-handle="ne"></div>
+                      <div className="resize-handle absolute -top-1 -left-1 bg-primary-500 border border-white cursor-nw-resize" data-handle="nw"></div>
+                    </>
                   )}
                 </div>
               );
@@ -220,12 +473,17 @@ const GlobalView = ({ rooms, items, onRoomsUpdate }) => {
               <span>选中状态</span>
             </div>
             <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 rounded border-2 border-orange-400"></div>
+              <span>未保存变更</span>
+            </div>
+            <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-primary-500 rounded-full"></div>
               <span>物品位置</span>
             </div>
           </div>
           <div className="text-xs">
             全局视图 • {rooms.length} 个房间 • {items.length} 个物品
+            {hasUnsavedChanges && <span className="text-orange-600 ml-2">• 有未保存的变更</span>}
           </div>
         </div>
       </div>
