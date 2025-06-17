@@ -16,6 +16,7 @@ import ExpiryManager from './components/Expiry/ExpiryManager';
 import ExpiryNotifications from './components/Expiry/ExpiryNotifications';
 import StockManager from './components/Stock/StockManager';
 import StockNotifications from './components/Stock/StockNotifications';
+import OrganizationMode from './components/Organization/OrganizationMode';
 
 function App() {
   const [rooms, setRooms] = useState([]);
@@ -222,6 +223,16 @@ function App() {
                       }}
                     />
                   } 
+                />
+                <Route
+                  path="/organization"
+                  element={
+                    <OrganizationMode
+                      items={items}
+                      rooms={rooms}
+                      onItemsUpdate={handleItemsUpdate}
+                    />
+                  }
                 />
               </Routes>
             </main>

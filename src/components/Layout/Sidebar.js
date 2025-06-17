@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Home, Archive, Package, Search, Plus, MapPin, Clock, TrendingDown } from 'lucide-react';
+import { X, Home, Archive, Package, Search, Plus, MapPin, Clock, TrendingDown, Sparkles } from 'lucide-react';
 import { ROOM_TYPE_LABELS } from '../../utils/constants';
 
 const Sidebar = ({ isOpen, onClose, rooms, onRoomSelect, selectedRoom }) => {
@@ -67,6 +67,20 @@ const Sidebar = ({ isOpen, onClose, rooms, onRoomSelect, selectedRoom }) => {
                 <span className="font-medium">{item.label}</span>
               </button>
             ))}
+            {/* 新增：整理模式入口 */}
+            <div className="pt-2 mt-2 border-t border-white/20">
+              <button
+                onClick={() => handleNavigation('/organization')}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all duration-200 ${
+                  location.pathname === '/organization'
+                    ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-soft-strong'
+                    : 'text-neutral-600 hover:bg-white/50 hover:text-neutral-800'
+                }`}
+              >
+                <Sparkles className={`w-5 h-5 ${location.pathname === '/organization' ? 'text-white' : 'text-amber-500'}`} />
+                <span className="font-semibold text-gradient-gold">整理模式</span>
+              </button>
+            </div>
           </nav>
 
           {/* 房间列表 */}
